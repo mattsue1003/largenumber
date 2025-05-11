@@ -276,10 +276,7 @@
                 }
             }
             
-            // 如果localStorage不可用，顯示警告
-            if (!isLocalStorageAvailable()) {
-                console.warn("LocalStorage不可用，遊戲紀錄將無法保存");
-            }
+            // 定義全局變數，確保作用域正確
             const startBtn = document.getElementById('startBtn');
             const timerDisplay = document.getElementById('timer');
             const scoreDisplay = document.getElementById('score');
@@ -302,17 +299,35 @@
             let gameRecords = [];
             let bestRecord = 0;
             
+            // 初始檢查localStorage並顯示警告
+            if (!isLocalStorageAvailable()) {
+                console.warn("LocalStorage不可用，遊戲紀錄將無法保存");
+                // 在此環境中不彈出警告，避免影響體驗
+                // alert("您的瀏覽器可能禁用了本地存儲功能，遊戲紀錄將無法保存。請檢查瀏覽器設置。");
+            }
+            
             // 從本地存儲加載遊戲記錄
             function loadRecords() {
-                const savedRecords = localStorage.getItem('numberGameRecords');
-                const savedBestRecord = localStorage.getItem('numberGameBestRecord');
+                if (!isLocalStorageAvailable()) return;
                 
-                if (savedRecords) {
-                    gameRecords = JSON.parse(savedRecords);
-                }
-                
-                if (savedBestRecord) {
-                    bestRecord = parseInt(savedBestRecord);
+                try {
+                    const savedRecords = localStorage.getItem('numberGameRecords');
+                    const savedBestRecord = localStorage.getItem('numberGameBestRecord');
+                    
+                    if (savedRecords) {
+                        gameRecords = JSON.parse(savedRecords);
+                        console.log("已加載遊戲紀錄:", gameRecords);
+                    }
+                    
+                    if (savedBestRecord) {
+                        bestRecord = parseInt(savedBestRecord, 10);
+                        console.log("已加載最佳紀錄:", bestRecord);
+                    }
+                } catch (error) {
+                    console.error("加載紀錄時出錯:", error);
+                    // 錯誤處理：重置記錄
+                    gameRecords = [];
+                    bestRecord = 0;
                 }
                 
                 updateRecordsDisplay();
@@ -320,15 +335,19 @@
             
             // 保存遊戲記錄到本地存儲
             function saveRecords() {
+                if (!isLocalStorageAvailable()) return;
+                
                 try {
                     localStorage.setItem('numberGameRecords', JSON.stringify(gameRecords));
                     localStorage.setItem('numberGameBestRecord', bestRecord.toString());
                     console.log("已保存記錄:", gameRecords, "最佳記錄:", bestRecord);
-                    updateRecordsDisplay();
                 } catch (error) {
                     console.error("保存紀錄出錯:", error);
-                    alert("無法保存遊戲紀錄，可能是瀏覽器不支援或已關閉本地存儲功能。");
+                    // 在此環境中不彈出警告，避免影響體驗
+                    // alert("無法保存遊戲紀錄，可能是瀏覽器不支援或已關閉本地存儲功能。");
                 }
+                
+                updateRecordsDisplay();
             }
             
             // 更新記錄顯示
@@ -352,8 +371,19 @@
                     recentRecords.forEach((record, index) => {
                         try {
                             const li = document.createElement('li');
-                            const date = new Date(record.date);
-                            const formattedDate = `${date.getFullYear()}/${(date.getMonth() + 1).toString().padStart(2, '0')}/${date.getDate().toString().padStart(2, '0')} ${date.getHours().toString().padStart(2, '0')}:${date.getMinutes().toString().padStart(2, '0')}`;
+                            let formattedDate = '未知日期';
+                            
+                            // 安全處理日期
+                            try {
+                                if (record.date) {
+                                    const date = new Date(record.date);
+                                    if (!isNaN(date.getTime())) {
+                                        formattedDate = `${date.getFullYear()}/${(date.getMonth() + 1).toString().padStart(2, '0')}/${date.getDate().toString().padStart(2, '0')} ${date.getHours().toString().padStart(2, '0')}:${date.getMinutes().toString().padStart(2, '0')}`;
+                                    }
+                                }
+                            } catch (dateError) {
+                                console.error("格式化日期時出錯:", dateError);
+                            }
                             
                             li.textContent = `${index + 1}. ${record.score} 題 (${formattedDate})`;
                             
@@ -369,9 +399,6 @@
                 } else {
                     recentRecordsDisplay.innerHTML = '<li>尚無紀錄</li>';
                 }
-                
-                // 確保紀錄區域可見
-                recordsArea.style.display = (gameTab.classList.contains('active')) ? 'none' : 'block';
             }
             
             // 添加新記錄
@@ -434,6 +461,7 @@
                 generateNumbers();
                 
                 // 設定倒數計時
+                clearInterval(timer); // 確保之前的計時器被清除
                 timer = setInterval(() => {
                     timeLeft--;
                     timerDisplay.textContent = timeLeft;
@@ -554,6 +582,8 @@
                 gameTab.classList.remove('active');
                 gameArea.style.display = 'none';
                 recordsArea.style.display = 'block';
+                // 每次切換到紀錄頁時，更新顯示確保最新
+                updateRecordsDisplay();
             });
             
             // 初始化遊戲

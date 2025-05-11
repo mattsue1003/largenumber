@@ -264,6 +264,22 @@
 
     <script>
         document.addEventListener('DOMContentLoaded', function() {
+            // 檢查localStorage是否可用
+            function isLocalStorageAvailable() {
+                try {
+                    const test = '__test__';
+                    localStorage.setItem(test, test);
+                    localStorage.removeItem(test);
+                    return true;
+                } catch (e) {
+                    return false;
+                }
+            }
+            
+            // 如果localStorage不可用，顯示警告
+            if (!isLocalStorageAvailable()) {
+                console.warn("LocalStorage不可用，遊戲紀錄將無法保存");
+            }
             const startBtn = document.getElementById('startBtn');
             const timerDisplay = document.getElementById('timer');
             const scoreDisplay = document.getElementById('score');
@@ -304,13 +320,21 @@
             
             // 保存遊戲記錄到本地存儲
             function saveRecords() {
-                localStorage.setItem('numberGameRecords', JSON.stringify(gameRecords));
-                localStorage.setItem('numberGameBestRecord', bestRecord.toString());
-                updateRecordsDisplay();
+                try {
+                    localStorage.setItem('numberGameRecords', JSON.stringify(gameRecords));
+                    localStorage.setItem('numberGameBestRecord', bestRecord.toString());
+                    console.log("已保存記錄:", gameRecords, "最佳記錄:", bestRecord);
+                    updateRecordsDisplay();
+                } catch (error) {
+                    console.error("保存紀錄出錯:", error);
+                    alert("無法保存遊戲紀錄，可能是瀏覽器不支援或已關閉本地存儲功能。");
+                }
             }
             
             // 更新記錄顯示
             function updateRecordsDisplay() {
+                console.log("更新紀錄顯示, 遊戲紀錄:", gameRecords, "最佳紀錄:", bestRecord);
+                
                 // 顯示最佳記錄
                 if (bestRecord > 0) {
                     bestRecordDisplay.textContent = `${bestRecord} 題`;
@@ -319,36 +343,47 @@
                 }
                 
                 // 顯示最近三次記錄
-                if (gameRecords.length > 0) {
+                if (gameRecords && gameRecords.length > 0) {
                     recentRecordsDisplay.innerHTML = '';
                     
                     // 只取最近三次記錄
                     const recentRecords = gameRecords.slice(0, 3);
                     
                     recentRecords.forEach((record, index) => {
-                        const li = document.createElement('li');
-                        const date = new Date(record.date);
-                        const formattedDate = `${date.getFullYear()}/${(date.getMonth() + 1).toString().padStart(2, '0')}/${date.getDate().toString().padStart(2, '0')} ${date.getHours().toString().padStart(2, '0')}:${date.getMinutes().toString().padStart(2, '0')}`;
-                        
-                        li.textContent = `${index + 1}. ${record.score} 題 (${formattedDate})`;
-                        
-                        if (record.score === bestRecord) {
-                            li.classList.add('best');
+                        try {
+                            const li = document.createElement('li');
+                            const date = new Date(record.date);
+                            const formattedDate = `${date.getFullYear()}/${(date.getMonth() + 1).toString().padStart(2, '0')}/${date.getDate().toString().padStart(2, '0')} ${date.getHours().toString().padStart(2, '0')}:${date.getMinutes().toString().padStart(2, '0')}`;
+                            
+                            li.textContent = `${index + 1}. ${record.score} 題 (${formattedDate})`;
+                            
+                            if (record.score === bestRecord) {
+                                li.classList.add('best');
+                            }
+                            
+                            recentRecordsDisplay.appendChild(li);
+                        } catch (e) {
+                            console.error("處理紀錄時出錯:", e, record);
                         }
-                        
-                        recentRecordsDisplay.appendChild(li);
                     });
                 } else {
                     recentRecordsDisplay.innerHTML = '<li>尚無紀錄</li>';
                 }
+                
+                // 確保紀錄區域可見
+                recordsArea.style.display = (gameTab.classList.contains('active')) ? 'none' : 'block';
             }
             
             // 添加新記錄
             function addNewRecord(score) {
+                if (score <= 0) return; // 不記錄零分遊戲
+                
                 const newRecord = {
                     score: score,
                     date: new Date().toISOString()
                 };
+                
+                console.log("添加新紀錄:", newRecord);
                 
                 // 將新記錄添加到前面
                 gameRecords.unshift(newRecord);
@@ -356,6 +391,7 @@
                 // 更新最佳記錄
                 if (score > bestRecord) {
                     bestRecord = score;
+                    console.log("達成新的最佳紀錄:", bestRecord);
                 }
                 
                 // 限制記錄數量
@@ -449,8 +485,11 @@
                 questionDisplay.textContent = '遊戲結束！';
                 resultDisplay.style.display = 'block';
                 
+                // 添加新記錄
+                addNewRecord(score);
+                
                 // 檢查是否達到最佳記錄
-                if (score > bestRecord) {
+                if (score >= bestRecord) {
                     resultDisplay.textContent = `恭喜！你創造了新紀錄：${score} 題！`;
                     resultDisplay.style.backgroundColor = '#f39c12';
                 } else {
@@ -458,8 +497,10 @@
                     resultDisplay.style.backgroundColor = '#3498db';
                 }
                 
-                // 添加新記錄
-                addNewRecord(score);
+                // 顯示紀錄頁面
+                setTimeout(() => {
+                    recordsTab.click();
+                }, 1500);
             }
             
             // 點擊數字方塊
